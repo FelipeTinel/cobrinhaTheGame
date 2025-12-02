@@ -8,6 +8,8 @@ using namespace std;
 int cellsize = 32;
 int cellcount = 30;
 
+
+
 bool IsRandomPosOnSnake(Vector2 pos, const deque<Vector2>& snakeBody)
 {
     for (int i = 0; i < snakeBody.size(); i++)
@@ -24,6 +26,7 @@ class Snake
 public:
     deque<Vector2> body = { {6, 9}, {5, 9}, {4, 9} };
     Vector2 direction = {1,0};
+    bool addSegment = false;
 
     void Draw(){
         for(int i = 0; i < body.size(); i++){
@@ -42,8 +45,19 @@ public:
     }
 
     void Update(){
-        body.pop_back();
+        
         body.push_front(Vector2Add(body[0], direction));
+
+        if (addSegment) {
+            
+            addSegment = false;
+
+        } else {
+
+            body.pop_back();
+
+        }
+
     }
 };
 
@@ -102,8 +116,10 @@ public:
     }
 
     void CheckIfAte(){
-        if(Vector2Equals(snake.body[0], food.position)){
+
+        if(Vector2Equals(snake.body[0], food.position)) {
             food.position = food.GenerateRandomPos(snake.body);
+            snake.addSegment = true;   
         }
     }
 };

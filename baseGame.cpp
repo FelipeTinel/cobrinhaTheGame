@@ -59,6 +59,12 @@ public:
         }
 
     }
+
+    void Reset(){
+        body = { {6, 9}, {5, 9}, {4, 9} };
+        direction = {1, 0};
+    }
+
 };
 
 class Food
@@ -104,6 +110,7 @@ class Game
 public:
     Snake snake = Snake();
     Food food = Food(snake.body);
+    bool IsRunning = true;
 
     void Draw(){
         snake.Draw();
@@ -111,8 +118,13 @@ public:
     }
 
     void Update(){
-        snake.Update();
-        CheckIfAte();
+        if(IsRunning){
+            snake.Update();
+            CheckIfAte();
+            CheckCollisionWithEdges();
+            CheckCollisionWithBody();           
+        }
+
     }
 
     void CheckIfAte(){
@@ -121,6 +133,29 @@ public:
             food.position = food.GenerateRandomPos(snake.body);
             snake.addSegment = true;   
         }
+    }
+
+    void CheckCollisionWithEdges(){
+        if(snake.body[0].x == cellcount || snake.body[0].x == -1){
+            GameOver();
+        }
+        if(snake.body[0].y == cellcount || snake.body[0].y == -1){
+            GameOver();
+        }
+    }
+
+    void CheckCollisionWithBody() {
+        for (int i = 1; i < snake.body.size(); i++) {
+            if (Vector2Equals(snake.body[0], snake.body[i])) {
+                GameOver();
+            }
+        }
+    }
+
+    void GameOver(){
+        snake.Reset();
+        food.position = food.GenerateRandomPos(snake.body);
+        IsRunning = false;
     }
 };
 
@@ -150,24 +185,28 @@ int main () {
                 if (game.snake.direction.y != 1) { 
                     game.snake.direction = {0, -1};
                 }
+                game.IsRunning = true;
                 break;
 
             case KEY_DOWN:
                 if (game.snake.direction.y != -1) {
                     game.snake.direction = {0, 1};
                 }
+                game.IsRunning = true;
                 break;
 
             case KEY_LEFT:
                 if (game.snake.direction.x != 1) { 
                     game.snake.direction = {-1, 0};
                 }
+                game.IsRunning = true;
                 break;
 
             case KEY_RIGHT:
                 if (game.snake.direction.x != -1) { 
                     game.snake.direction = {1, 0};
                 }
+                game.IsRunning = true;
                 break;
          }
 

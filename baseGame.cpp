@@ -2,12 +2,13 @@
 #include <deque>
 #include <iostream>
 #include <raymath.h>
+#include <optional>
 
 using namespace std;
 
 int cellsize = 32;
 int cellcount = 30;
-
+int offset = 50;
 
 // - NOTA DE FELIPE TINEL, O CONQUISTADOR.
     //   Esse trecho do código é interessante aperfeiçoa-lo.
@@ -19,32 +20,32 @@ int cellcount = 30;
 
 // ________________________________________________________________________________//
 
-// deque<Vector2> posOccupied;
-// void OccupiedCell(Vector2 pos, const deque<Vector2>& snakeBody)
+// enum GameMode 
 // {
-//     for (int i = 0; i < snakeBody.size(); i++)
-//     {
-//         if (Vector2Equals(snakeBody[i], pos)) return; 
-//     }
-//     ;
+//     SinglePlayer,
+//     Multiplayer
 // }
 
-// ________________________________________________________________________________//
 
-
-
-bool IsRandomPosOnSnake(Vector2 pos, const deque<Vector2>& snakeBody1, const deque<Vector2>& snakeBody2)
+bool IsRandomPosOnSnake(const deque<Vector2>& OccupiedCell, Vector2 pos)
 {
-    for (int i = 0; i < snakeBody1.size(); i++)
+    for (int i = 0; i < OccupiedCell.size(); i++)
     {
-        if (Vector2Equals(snakeBody1[i], pos)) return true; 
+        if (Vector2Equals(OccupiedCell[i], pos)) return true; 
     }
 
-    for (int i = 0; i < snakeBody2.size(); i++)
-        {
-            if (Vector2Equals(snakeBody2[i], pos)) return true; 
-        }
     return false;
+}
+
+void AddSequenceInOccupiedCell (deque<Vector2>& sequence, deque<Vector2>& OccupiedCell)
+{
+    OccupiedCell.insert (
+        OccupiedCell.end(),
+        sequence.begin(),
+        sequence.end()
+
+    );
+
 }
 
 
@@ -52,12 +53,14 @@ class Snake
 {
 public:
 
-    // deque<Vector2> body = { {6, 9}, {5, 9}, {4, 9} };
-    // Vector2 direction = {1,0};
     deque<Vector2> body;
     Vector2 direction;
     bool addSegment = false;
     int player = 0;
+    float scale;
+    Texture2D texture;
+    Image image;
+    Color snakeColor;
 
     Snake (int identify)
     {
@@ -67,18 +70,33 @@ public:
             body = { {6, 9}, {5, 9}, {4, 9} };
             direction = {1, 0};
             player = 1;
+            image = LoadImage("Gráficos/cobraAzul-removebg-preview.png");
+            snakeColor = BLUE; 
+
             break;
 
             case 2:
-            body = { {9, 6}, {9, 5}, {9, 4} };
+            body = { {24, 21}, {25, 21}, {26, 21} };
             direction = {-1, 0};
             player = 2;
+            image = LoadImage("Gráficos/cobraVermelha-removebg-preview.png");
+            snakeColor = RED;
+
             break;
+
+
         }
+
+        ImageResize(&image, cellsize, cellsize); 
+        texture = LoadTextureFromImage(image);
+        UnloadImage(image);
+
 
     }
 
-    void Draw(){
+    void Draw()
+    {
+
         for(int i = 0; i < body.size(); i++){
             float x = body[i].x * cellsize;
             float y = body[i].y * cellsize;
@@ -90,14 +108,30 @@ public:
                 (float)cellsize
             };
 
-            if (player == 1)
-            DrawRectangleRounded(segment, 0.5f, 6, GREEN);
-            else if (player == 2)
-            DrawRectangleRounded(segment, 0.5f, 6, BLUE);
+            scale = cellsize / texture.height;
+  
+            if (i == 0) {
+                if (Vector2Equals(direction, {1, 0}))
+                DrawTextureEx(texture, body[0] * cellsize, 90, scale, WHITE);
+                else if (Vector2Equals(direction, {-1, 0}))
+                DrawTextureEx(texture, body[0] * cellsize, 270, scale, WHITE);
+                else if (Vector2Equals(direction, {0, -1}))
+                DrawTextureEx(texture, body[0] * cellsize, 0, scale, WHITE);
+                else if (Vector2Equals(direction, {0, 1}))
+                DrawTextureEx(texture, body[0] * cellsize, 180, scale, WHITE);
+                } else {
+                    DrawRectangleRounded(segment, 0.5f, 6, snakeColor);
+                }
+
+              
+
+
         }
     }
 
-    void Update(){
+
+    void Update()
+    {
         
         body.push_front(Vector2Add(body[0], direction));
 
@@ -113,7 +147,9 @@ public:
 
     }
 
-    void Reset(){
+
+    void Reset()
+    {
         switch (player)
         {
         case 1:
@@ -121,11 +157,11 @@ public:
             direction = {1, 0};
             break;
         case 2:
-            body = { {9, 6}, {9, 5}, {9, 4} };
+            body = { {24, 21}, {25, 21}, {26, 21} };
             direction = {-1, 0};
             break;
-    };
-    };
+    }
+    }
     
 
 };
@@ -136,13 +172,12 @@ public:
     Vector2 position = {6,7};
     Texture2D texture;
 
-    Food(deque<Vector2>& snakeBody1, deque<Vector2>& snakeBody2){
+    Food(){
         Image image = LoadImage("Gráficos/Maçã.png");
         ImageResize(&image, cellsize, cellsize); 
         texture = LoadTextureFromImage(image);
         UnloadImage(image);
 
-        position = GenerateRandomPos(snakeBody1, snakeBody2);
     }
 
     ~Food(){
@@ -153,7 +188,7 @@ public:
         DrawTexture(texture,position.x * cellsize,position.y * cellsize, WHITE);
      }
 
-    Vector2 GenerateRandomPos(const deque<Vector2>& snakeBody1, const deque<Vector2>& snakeBody2){
+    Vector2 GenerateRandomPos(const deque<Vector2>& Occupied){
       Vector2 position;
 
         do {
@@ -161,7 +196,7 @@ public:
             float y = (float)GetRandomValue(0, cellcount - 1);
             position = {x, y};
         }
-        while (IsRandomPosOnSnake(position, snakeBody1, snakeBody2));
+        while (IsRandomPosOnSnake(Occupied, position));
 
         return position;
     }
@@ -172,112 +207,167 @@ public:
 class Game
 {
 public:
+    
+    // Principal objetivo (talvez não o melhor, mas o que eu melhor visualizo) da classe Game: Criar um construtor que recebe "Modo de Jogo"
+    // como parâmetro e, a partir disso, utiliza ou não a váriavel opcional "snake2". A partir disso, modificar os métodos com "Multiplayer"
+    // no nome, colocando para receber um parâmetro de modo também e utilizando-as de maneira diferente atráves de um switch case. A depender
+    // do modo passado no parametro na main, o jogo mudaria. Olha que lindo.
+    
     Snake snake1;
     Snake snake2;
-    Food food = Food(snake1.body, snake2.body);
+    deque<Vector2> OccupiedCell;
+    Food food;
     bool IsRunning = true;
 
+    Game() : snake1(1), snake2(2), food() {
+      
+        MultiplayerOccupiedUpdate();
+        food.position = food.GenerateRandomPos(OccupiedCell);
+    }
 
-    Game() : snake1(1), snake2(2), food(snake1.body, snake2.body) {}
+    
 
 
-    void Draw(){
-        snake1.Draw();
+ // Parte pra modificar:   
+//__________________________________________________________
+    
+    // Isso aqui faz com que "Food" utilize aquele deque que te falei, que recebe todos
+    // os corpos de cobra.
+    void MultiplayerOccupiedUpdate()
+    {
+        OccupiedCell.clear();
+        AddSequenceInOccupiedCell(snake1.body, OccupiedCell);
+        AddSequenceInOccupiedCell(snake2.body, OccupiedCell);
+    }
+
+    void MultiplayerDraw(){
         snake2.Draw();
+        snake1.Draw();
         food.Draw();
     }
-
-    void Update(){
+ 
+    void MultiplayerUpdate(){
         if(IsRunning){
+   
+            
+            Movement(snake1);
+            Movement(snake2);
             snake1.Update();
             snake2.Update();
-            CheckIfAte();
-            CheckCollisionWithEdges();
-            CheckCollisionWithBody();           
+            MultiplayerOccupiedUpdate();
+            CheckCollisionWithEdges(snake1);
+            CheckCollisionWithEdges(snake2);
+            CheckCollisionWithBody(snake1);
+            CheckCollisionWithBody(snake2); 
+            CheckCollisionWithOpp();            
+            CheckBodyInOtherBody();
+            CheckIfAte(snake1, food);
+            CheckIfAte(snake2, food);
         }
+
+        if (IsRunning == false && IsKeyPressed(KEY_SPACE))
+        IsRunning = true;
 
     }
 
-    void CheckIfAte(){
-
-        if(Vector2Equals(snake1.body[0], food.position)) {
-            food.position = food.GenerateRandomPos(snake1.body, snake2.body);
-            snake1.addSegment = true;   
-        }
-
-        if(Vector2Equals(snake2.body[0], food.position)) {
-            food.position = food.GenerateRandomPos(snake1.body, snake2.body);
-            snake2.addSegment = true;   
-        }
-    }
-
-    void CheckCollisionWithEdges(){
-        if(snake1.body[0].x == cellcount || snake1.body[0].x == -1){
-            GameOver();
-        }
-        if(snake1.body[0].y == cellcount || snake1.body[0].y == -1){
-            GameOver();
-        }
-        if(snake2.body[0].x == cellcount || snake2.body[0].x == -1){
-            GameOver();
-        }
-        if(snake2.body[0].y == cellcount || snake2.body[0].y == -1){
-            GameOver();
-        }
-    }
-
-    void CheckCollisionWithBody() {
-        for (int i = 1; i < snake1.body.size(); i++) {
-            if (Vector2Equals(snake1.body[0], snake1.body[i]) && Vector2Equals(snake2.body[0], snake2.body[i])) {
-                GameOver();
-            }
-        }
-        for (int i = 1; i < snake2.body.size(); i++) {
-            if (Vector2Equals(snake2.body[0], snake2.body[i]) && Vector2Equals(snake1.body[0], snake1.body[i])) {
-                GameOver();
-            }
-        }
-    }
-
-    void GameOver(){
+        void MupltiplayerGameOver(){
         snake1.Reset();
         snake2.Reset();
-        food.position = food.GenerateRandomPos(snake1.body, snake2.body);
+        food.position = food.GenerateRandomPos(OccupiedCell);
         IsRunning = false;
     }
 
-    void Movement ()
+//_________________________________________________________________________
+
+    void CheckIfAte(Snake& snake, Food& food){
+
+        if(Vector2Equals(snake.body[0], food.position)) {
+            food.position = food.GenerateRandomPos(OccupiedCell);
+            snake.addSegment = true;   
+        }
+    }
+
+    void CheckCollisionWithEdges(Snake& snake){
+        if(snake.body[0].x == cellcount || snake.body[0].x == -1
+          || snake.body[0].y < 0 || snake.body[0].y >= cellcount){
+            MupltiplayerGameOver();
+        }
+    }
+
+    void CheckCollisionWithBody(Snake& snake) {
+        for (int i = 1; i < snake.body.size(); i++) {
+            if (Vector2Equals(snake.body[0], snake.body[i])) {
+                MupltiplayerGameOver();
+            }
+        }
+        
+    }
+
+    void CheckCollisionWithOpp () 
+    {
+        for (int i = 1; i < snake2.body.size(); i++) {
+            if (Vector2Equals(snake1.body[0], snake2.body[i])) {
+                MupltiplayerGameOver();
+            }
+        }
+        
+        for (int i = 1; i < snake1.body.size(); i++) {
+            if (Vector2Equals(snake2.body[0], snake1.body[i])) {
+                MupltiplayerGameOver();
+            }
+        }
+    }
+
+    void CheckBodyInOtherBody()
+    {
+        for (int i = 1; i < snake2.body.size(); i++) {
+            for (int j = 1; j < snake1.body.size(); j++) {
+                if (Vector2Equals(snake2.body[i], snake1.body[j])) {
+                MupltiplayerGameOver();
+            }
+            }
+            
+        }
+               
+    }
+
+    void Movement (Snake& snake)
     {
 
-        if (IsKeyDown(KEY_UP) && snake2.direction.y != 1)
-        snake2.direction = {0, -1};
+        switch (snake.player)
+        {
+            case 1:
+            if (IsKeyDown(KEY_W) && snake.direction.y != 1)
+            snake.direction = {0, -1};
 
-        if (IsKeyDown(KEY_DOWN) && snake2.direction.y != -1)
-        snake2.direction = {0, 1};
+            if (IsKeyDown(KEY_S) && snake.direction.y != -1)
+            snake.direction = {0, 1};
 
-        if (IsKeyDown(KEY_LEFT) && snake2.direction.x != 1)
-        snake2.direction = {-1, 0};
+            if (IsKeyDown(KEY_A) && snake.direction.x != 1)
+            snake.direction = {-1, 0};
 
-        if (IsKeyDown(KEY_RIGHT) && snake2.direction.x != -1)
-        snake2.direction = {1, 0};
+            if (IsKeyDown(KEY_D) && snake.direction.x != -1)
+            snake.direction = {1, 0};
+            break;
 
-        if (IsKeyDown(KEY_W) && snake1.direction.y != 1)
-        snake1.direction = {0, -1};
+            case 2:
+            if (IsKeyDown(KEY_UP) && snake.direction.y != 1)
+            snake.direction = {0, -1};
 
-        if (IsKeyDown(KEY_S) && snake1.direction.y != -1)
-        snake1.direction = {0, 1};
+            if (IsKeyDown(KEY_DOWN) && snake.direction.y != -1)
+            snake.direction = {0, 1};
 
-        if (IsKeyDown(KEY_A) && snake1.direction.x != 1)
-        snake1.direction = {-1, 0};
+            if (IsKeyDown(KEY_LEFT) && snake.direction.x != 1)
+            snake.direction = {-1, 0};
 
-        if (IsKeyDown(KEY_D) && snake1.direction.x != -1)
-        snake1.direction = {1, 0};
+            if (IsKeyDown(KEY_RIGHT) && snake.direction.x != -1)
+            snake.direction = {1, 0};
+            
+        }
 
-    IsRunning = true;
+       
 }
 
-
-    
 
 
 };
@@ -288,7 +378,7 @@ public:
 int main () {
 
     cout << "Iniciando o jogo..." << endl;
-    InitWindow(cellsize*cellcount, cellsize*cellcount, "Jogo da Cobrinha");
+    InitWindow(2 * offset + cellsize * cellcount, 2 * offset + cellsize * cellcount, "Jogo da Cobrinha");
     SetTargetFPS(60);
 
     Game game;
@@ -298,18 +388,15 @@ int main () {
     while (!WindowShouldClose()) {
 
         if (GetTime() - lastUpdateTime >= 0.2) { 
-            game.Update();
+            game.MultiplayerUpdate();
             lastUpdateTime = GetTime();
         }
 
 
-        game.Movement();
-
-
         BeginDrawing();
-        ClearBackground(RED);
+        ClearBackground(GREEN);
 
-        game.Draw();
+        game.MultiplayerDraw();
 
         EndDrawing();
     }

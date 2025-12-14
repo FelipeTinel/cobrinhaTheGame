@@ -30,6 +30,7 @@ public:
     Vector2 direction;
     bool addSegment = false;
     int player = 0;
+    int score = 0;
     Texture2D texture;
     Image image;
     Color snakeColor;
@@ -46,7 +47,7 @@ public:
         }
         else
         {
-            body = {{24, 21}, {25, 21}, {26, 21}};
+            body = {{20, 21}, {21, 21}, {22, 21}};
             direction = {-1, 0};
             player = 2;
             image = LoadImage("Gráficos/cobraVermelha-removebg-preview.png");
@@ -75,29 +76,74 @@ public:
         }
         else
         {
-            body = {{24, 21}, {25, 21}, {26, 21}};
+             body = {{6, 9}, {5, 9}, {4, 9}};
+            // body = {{24, 21}, {25, 21}, {26, 21}};
             direction = {-1, 0};
         }
     }
 
+    float DirectionToRotation(Vector2 dir)
+{
+    if (Vector2Equals(dir, (Vector2){0, -1})) return 0.0f;
+    if (Vector2Equals(dir, (Vector2){1, 0}))  return 90.0f;
+    if (Vector2Equals(dir, (Vector2){0, 1}))  return 180.0f;
+    if (Vector2Equals(dir, (Vector2){-1, 0})) return 270.0f;
+    return 0.0f;
+}
+
+
     void Draw()
+{
+    for (int i = 0; i < body.size(); i++)
     {
-        for (int i = 0; i < body.size(); i++)
+        float x = offset + body[i].x * cellsize;
+        float y = offset + body[i].y * cellsize;
+
+        Rectangle segment = {
+            x,
+            y,
+            (float)cellsize,
+            (float)cellsize
+        };
+
+        if (i == 0)
         {
-            Rectangle r = 
-            {
-                offset + body[i].x * cellsize,
-                offset + body[i].y * cellsize,
+            Rectangle source = {
+                0, 0,
+                (float)texture.width,
+                (float)texture.height
+            };
+
+            Rectangle dest = {
+                x + cellsize / 2,
+                y + cellsize / 2,
                 cellsize,
                 cellsize
             };
 
-            if (i == 0)
-                DrawRectangleRounded(r, 0.4f, 6, WHITE);
-            else
-                DrawRectangleRounded(r, 0.5f, 6, snakeColor);
+            Vector2 origin = {
+                cellsize / 2,
+                cellsize / 2
+            };
+
+            float rotation = DirectionToRotation(direction);
+
+            DrawTexturePro(
+                texture,
+                source,
+                dest,
+                origin,
+                rotation,
+                WHITE
+            );
+        }
+        else
+        {
+            DrawRectangleRounded(segment, 0.5f, 6, snakeColor);
         }
     }
+}
+
 };
 
 class Food
@@ -143,28 +189,55 @@ enum class GameAction
     BACK_TO_MENU
 };
 
+enum class Winner
+{
+    SnakeOne,
+    SnakeTwo,
+    None
+};
+
 class Game
 {
 public:
     Snake snake1{1};
     optional<Snake> snake2;
     deque<Vector2> OccupiedCell;
+    bool newRecord = false;
     Food food;
+    int& record;
     bool IsRunning = true;
     GameMode mode;
+    Winner victor = Winner::None;
 
-    Game(GameMode gm) : mode(gm)
+    Game(GameMode gm, int& globalRecord) : mode(gm), record(globalRecord)
     {
         ResetGame();
     }
 
-    void GameOver()
+    void ResetScore(Snake& snake)
     {
+        snake.score = 0;
+    }
+
+    void CheckRecord()
+    {
+        if (mode == GameMode::SINGLE && snake1.score > record)
+        {
+            record = snake1.score;
+            newRecord = true;
+        }
+    }
+
+    void GameOver()
+    {   
         IsRunning = false;
+        CheckRecord();
     }
 
     void ResetGame()
     {
+        newRecord = false;
+        snake1.score = 0;
         snake1.Reset();
 
         if (mode == GameMode::MULTI)
@@ -172,12 +245,13 @@ public:
         else
             snake2.reset();
 
-        MultiplayerOccupiedUpdate();
+        OccupiedUpdate();
         food.position = food.GenerateRandomPos(OccupiedCell);
         IsRunning = true;
     }
 
-    void MultiplayerOccupiedUpdate()
+
+    void OccupiedUpdate()
     {
         OccupiedCell.clear();
         AddSequenceInOccupiedCell(snake1.body, OccupiedCell);
@@ -190,24 +264,30 @@ public:
     {
         if (!IsRunning) return;
 
-        Movement(snake1);
+        // Movement(snake1);
         snake1.Update();
         CheckCollisionWithEdges(snake1);
         if (!IsRunning) return;
+
         CheckCollisionWithBody(snake1);
         if (!IsRunning) return;
+        
 
         if (snake2)
         {
-            Movement(*snake2);
+            // Movement(*snake2);
             snake2->Update();
             CheckCollisionWithEdges(*snake2);
             if (!IsRunning) return;
             CheckCollisionWithBody(*snake2);
             if (!IsRunning) return;
 
+            GameDraw(snake1, *snake2);
+            if (!IsRunning) return;
+
             CheckCollisionWithOpp();
             if (!IsRunning) return;
+
 
             if (Vector2Equals(snake1.body[0], snake2->body[0]))
             {
@@ -216,10 +296,23 @@ public:
             }
         }
 
-        MultiplayerOccupiedUpdate();
+        OccupiedUpdate();
 
         CheckIfAte(snake1, food);
         if (snake2) CheckIfAte(*snake2, food);
+    }
+
+    void UpdateInputs(GameMode mode)
+    {
+        switch (mode)
+        {
+        case GameMode::MULTI:
+            Movement(*snake2);
+        case GameMode::SINGLE:
+            Movement(snake1);
+            break;
+        }
+
     }
 
     void CheckIfAte(Snake& snake, Food& food)
@@ -228,6 +321,7 @@ public:
         {
             snake.addSegment = true;
             food.position = food.GenerateRandomPos(OccupiedCell);
+            snake.score++;
         }
     }
 
@@ -238,6 +332,7 @@ public:
 
         if (x < 0 || x >= cellcount || y < 0 || y >= cellcount) 
         {
+            CheckLoser(snake);
             GameOver();
 
             if (snake.body.size() > 1) {
@@ -251,11 +346,32 @@ public:
         }
     }
 
+    void CheckLoser(Snake& snake)
+    {
+        if (snake.player == 1) victor = Winner::SnakeTwo;
+        if (snake.player == 2) victor = Winner::SnakeOne;
+    }
+
 
     void CheckCollisionWithBody(Snake& snake)
     {
         for (int i = 1; i < snake.body.size(); i++)
-            if (Vector2Equals(snake.body[0], snake.body[i])) GameOver();
+            if (Vector2Equals(snake.body[0], snake.body[i]))
+            {
+                CheckLoser(snake);
+                GameOver();
+            } 
+    }
+
+    void GameDraw(Snake& snake1, Snake& snake2)
+    {
+        if (snake1.body[0] == snake2.body[0])
+                {
+                    if (snake1.score > snake2.score) victor = Winner::SnakeOne;
+                    else if (snake2.score > snake1.score) victor = Winner::SnakeTwo;
+                    else victor = Winner::None;
+                }
+
     }
 
     void CheckCollisionWithOpp()
@@ -263,10 +379,19 @@ public:
         if (!snake2) return;
 
         for (int i = 1; i < snake2->body.size(); i++)
-            if (Vector2Equals(snake1.body[0], snake2->body[i])) GameOver();
+            if (Vector2Equals(snake1.body[0], snake2->body[i]))
+            {   
+                
+                victor = Winner::SnakeTwo;
+                GameOver();
+            } 
 
         for (int i = 1; i < snake1.body.size(); i++)
-            if (Vector2Equals(snake2->body[0], snake1.body[i])) GameOver();
+            if (Vector2Equals(snake2->body[0], snake1.body[i]))
+            {
+                victor = Winner::SnakeOne;
+                GameOver();
+            }
     }
 
     void Movement(Snake& snake)
@@ -310,6 +435,21 @@ public:
 
             DrawText("Jogar novamente", restartBtn.x + 20, restartBtn.y + 15, 20, BLACK);
             DrawText("Voltar ao menu", menuBtn.x + 40, menuBtn.y + 15, 20, BLACK);
+            if (newRecord == true)
+            {
+                DrawText(TextFormat("Novo Recorde: %i", record), 220, menuBtn.y + 60, 20, BLACK);
+            }
+             if (mode == GameMode::MULTI)
+            {
+                if (victor == Winner::SnakeOne)
+                DrawText("Vencedor: Cobra Azul!", 220, menuBtn.y + 60, 20, BLUE);
+                else if (victor == Winner::SnakeTwo)
+                DrawText("Vencedor: Cobra Vermelha!", 220, menuBtn.y + 60, 20, RED);
+                else {
+                    DrawText("Empate!", 220, menuBtn.y + 60, 20, BLACK);
+                }
+                
+            }
 
             Vector2 mouse = GetMousePosition();
 
@@ -335,6 +475,8 @@ int main()
 
     SetTargetFPS(60);
 
+    int record = 0;
+
 voltar_menu:
     GameMode mode;
     bool selected = false;
@@ -344,7 +486,7 @@ voltar_menu:
         BeginDrawing();
         ClearBackground(GREEN);
 
-        DrawText("Escolha o modo de jogo", 100, 50, 30, WHITE);
+        DrawText("Escolha o modo de jogo", 100, 50, 30, BLACK);
 
         Rectangle singleBtn = {100, 150, 300, 50};
         Rectangle multiBtn = {100, 250, 300, 50};
@@ -354,6 +496,8 @@ voltar_menu:
 
         DrawText("Singleplayer", singleBtn.x + 50, singleBtn.y + 10, 20, BLACK);
         DrawText("Multiplayer", multiBtn.x + 50, multiBtn.y + 10, 20, BLACK);
+        DrawText(TextFormat("Recorde: %i", record), offset - 5, offset + cellsize * cellcount - 30, 40, BLACK);
+
 
         Vector2 mouse = GetMousePosition();
 
@@ -374,11 +518,13 @@ voltar_menu:
         EndDrawing();
     }
 
-    Game game(mode);
+    Game game(mode, record);
     double lastUpdateTime = GetTime();
 
     while (!WindowShouldClose())
     {
+
+        game.UpdateInputs(mode);
 
         if (game.IsRunning && GetTime() - lastUpdateTime >= 0.2)
         {
@@ -396,11 +542,22 @@ voltar_menu:
             5, DARKGREEN
         );
 
+        if (mode == GameMode::SINGLE)
+        DrawText(TextFormat("Score: %i", game.snake1.score), offset - 5, offset + cellsize * cellcount + 5, 30, BLACK);
+        else
+        {
+        DrawText(TextFormat("Score: %i", game.snake1.score), offset - 5, offset + cellsize * cellcount + 5, 30, BLUE);
+        DrawText(TextFormat("Score: %i", game.snake2->score), cellsize * cellcount - (offset + 50), offset + cellsize * cellcount + 5, 30, RED);
+        }
+
+
         GameAction action = game.Draw();
         EndDrawing();
 
         if (!game.IsRunning)
         {
+            record = game.record;
+
             if (action == GameAction::RESTART)
             {
                 game.ResetGame();

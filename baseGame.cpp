@@ -2,403 +2,415 @@
 #include <deque>
 #include <iostream>
 #include <raymath.h>
-#include <optional>
+#include <optional> 
+#include "Button.hpp"
 
 using namespace std;
 
-int cellsize = 32;
-int cellcount = 30;
-int offset = 50;
-
-// - NOTA DE FELIPE TINEL, O CONQUISTADOR.
-    //   Esse trecho do código é interessante aperfeiçoa-lo.
-    //   O que fiz atualmente é uma forma funcional, mas não eficiente, de checar
-    //   se uma fruta nascerá numa posição ocupada pela cobra ou não.
-    //   A ideia, no futuro, é criar uma váriavel global relacionada a uma posição
-    //   ocupada na matriz que sirva de parâmetro para a fruta.
-    //   Os primeiros passos estão nessa função e variável comentada.
-
-// ________________________________________________________________________________//
-
-// enum GameMode 
-// {
-//     SinglePlayer,
-//     Multiplayer
-// }
-
+float cellsize = 24.0f;
+int cellcount = 25;
+float offset = 40.0f;
 
 bool IsRandomPosOnSnake(const deque<Vector2>& OccupiedCell, Vector2 pos)
 {
     for (int i = 0; i < OccupiedCell.size(); i++)
-    {
-        if (Vector2Equals(OccupiedCell[i], pos)) return true; 
-    }
-
+        if (Vector2Equals(OccupiedCell[i], pos)) return true;
     return false;
 }
 
-void AddSequenceInOccupiedCell (deque<Vector2>& sequence, deque<Vector2>& OccupiedCell)
+void AddSequenceInOccupiedCell(deque<Vector2>& sequence, deque<Vector2>& OccupiedCell)
 {
-    OccupiedCell.insert (
-        OccupiedCell.end(),
-        sequence.begin(),
-        sequence.end()
-
-    );
-
+    OccupiedCell.insert(OccupiedCell.end(), sequence.begin(), sequence.end());
 }
-
 
 class Snake
 {
 public:
-
     deque<Vector2> body;
     Vector2 direction;
     bool addSegment = false;
     int player = 0;
-    float scale;
     Texture2D texture;
     Image image;
     Color snakeColor;
 
-    Snake (int identify)
+    Snake(int identify)
     {
-        switch (identify)
+        if (identify == 1)
         {
-            case 1:
-            body = { {6, 9}, {5, 9}, {4, 9} };
+            body = {{6, 9}, {5, 9}, {4, 9}};
             direction = {1, 0};
             player = 1;
             image = LoadImage("Gráficos/cobraAzul-removebg-preview.png");
-            snakeColor = BLUE; 
-
-            break;
-
-            case 2:
-            body = { {24, 21}, {25, 21}, {26, 21} };
+            snakeColor = BLUE;
+        }
+        else
+        {
+            body = {{24, 21}, {25, 21}, {26, 21}};
             direction = {-1, 0};
             player = 2;
             image = LoadImage("Gráficos/cobraVermelha-removebg-preview.png");
             snakeColor = RED;
-
-            break;
-
-
         }
 
-        ImageResize(&image, cellsize, cellsize); 
+        ImageResize(&image, (int)cellsize, (int)cellsize);
         texture = LoadTextureFromImage(image);
         UnloadImage(image);
+    }
 
+    void Update()
+    {
+        body.push_front(Vector2Add(body[0], direction));
+        if (addSegment) addSegment = false;
+        else body.pop_back();
+    }
 
+    void Reset()
+    {
+        addSegment = false;
+        if (player == 1)
+        {
+            body = {{6, 9}, {5, 9}, {4, 9}};
+            direction = {1, 0};
+        }
+        else
+        {
+            body = {{24, 21}, {25, 21}, {26, 21}};
+            direction = {-1, 0};
+        }
     }
 
     void Draw()
     {
-
-        for(int i = 0; i < body.size(); i++){
-            float x = body[i].x * cellsize;
-            float y = body[i].y * cellsize;
-
-            Rectangle segment = {
-                x,
-                y,
-                (float)cellsize,
-                (float)cellsize
+        for (int i = 0; i < body.size(); i++)
+        {
+            Rectangle r = 
+            {
+                offset + body[i].x * cellsize,
+                offset + body[i].y * cellsize,
+                cellsize,
+                cellsize
             };
 
-            scale = cellsize / texture.height;
-  
-            if (i == 0) {
-                if (Vector2Equals(direction, {1, 0}))
-                DrawTextureEx(texture, body[0] * cellsize, 90, scale, WHITE);
-                else if (Vector2Equals(direction, {-1, 0}))
-                DrawTextureEx(texture, body[0] * cellsize, 270, scale, WHITE);
-                else if (Vector2Equals(direction, {0, -1}))
-                DrawTextureEx(texture, body[0] * cellsize, 0, scale, WHITE);
-                else if (Vector2Equals(direction, {0, 1}))
-                DrawTextureEx(texture, body[0] * cellsize, 180, scale, WHITE);
-                } else {
-                    DrawRectangleRounded(segment, 0.5f, 6, snakeColor);
-                }
-
-              
-
-
+            if (i == 0)
+                DrawRectangleRounded(r, 0.4f, 6, WHITE);
+            else
+                DrawRectangleRounded(r, 0.5f, 6, snakeColor);
         }
     }
-
-
-    void Update()
-    {
-        
-        body.push_front(Vector2Add(body[0], direction));
-
-        if (addSegment) {
-            
-            addSegment = false;
-
-        } else {
-
-            body.pop_back();
-
-        }
-
-    }
-
-
-    void Reset()
-    {
-        switch (player)
-        {
-        case 1:
-            body = { {6, 9}, {5, 9}, {4, 9} };
-            direction = {1, 0};
-            break;
-        case 2:
-            body = { {24, 21}, {25, 21}, {26, 21} };
-            direction = {-1, 0};
-            break;
-    }
-    }
-    
-
 };
 
 class Food
 {
-public:   
-    Vector2 position = {6,7};
+public:
+    Vector2 position;
     Texture2D texture;
 
-    Food(){
+    Food()
+    {
         Image image = LoadImage("Gráficos/Maçã.png");
-        ImageResize(&image, cellsize, cellsize); 
+        ImageResize(&image, (int)cellsize, (int)cellsize);
         texture = LoadTextureFromImage(image);
         UnloadImage(image);
-
     }
 
-    ~Food(){
-        UnloadTexture(texture);
+    void Draw()
+    {
+        DrawTexture(texture, offset + position.x * cellsize, offset + position.y * cellsize, WHITE);
     }
 
-    void Draw(){
-        DrawTexture(texture,position.x * cellsize,position.y * cellsize, WHITE);
-     }
-
-    Vector2 GenerateRandomPos(const deque<Vector2>& Occupied){
-      Vector2 position;
-
-        do {
-            float x = (float)GetRandomValue(0, cellcount - 1);
-            float y = (float)GetRandomValue(0, cellcount - 1);
-            position = {x, y};
-        }
-        while (IsRandomPosOnSnake(Occupied, position));
-
-        return position;
+    Vector2 GenerateRandomPos(const deque<Vector2>& Occupied)
+    {
+        Vector2 pos;
+        do
+        {
+            pos = {(float)GetRandomValue(0, cellcount - 1), (float)GetRandomValue(0, cellcount - 1)};
+        } while (IsRandomPosOnSnake(Occupied, pos));
+        return pos;
     }
-
 };
 
+enum class GameMode
+{
+    SINGLE,
+    MULTI
+};
+
+enum class GameAction
+{
+    NONE,
+    RESTART,
+    BACK_TO_MENU
+};
 
 class Game
 {
 public:
-    
-    // Principal objetivo (talvez não o melhor, mas o que eu melhor visualizo) da classe Game: Criar um construtor que recebe "Modo de Jogo"
-    // como parâmetro e, a partir disso, utiliza ou não a váriavel opcional "snake2". A partir disso, modificar os métodos com "Multiplayer"
-    // no nome, colocando para receber um parâmetro de modo também e utilizando-as de maneira diferente atráves de um switch case. A depender
-    // do modo passado no parametro na main, o jogo mudaria. Olha que lindo.
-    
-    Snake snake1;
-    Snake snake2;
+    Snake snake1{1};
+    optional<Snake> snake2;
     deque<Vector2> OccupiedCell;
     Food food;
     bool IsRunning = true;
+    GameMode mode;
 
-    Game() : snake1(1), snake2(2), food() {
-      
-        MultiplayerOccupiedUpdate();
-        food.position = food.GenerateRandomPos(OccupiedCell);
+    Game(GameMode gm) : mode(gm)
+    {
+        ResetGame();
     }
 
-    
+    void GameOver()
+    {
+        IsRunning = false;
+    }
 
+    void ResetGame()
+    {
+        snake1.Reset();
 
- // Parte pra modificar:   
-//__________________________________________________________
-    
-    // Isso aqui faz com que "Food" utilize aquele deque que te falei, que recebe todos
-    // os corpos de cobra.
+        if (mode == GameMode::MULTI)
+            snake2 = Snake(2);
+        else
+            snake2.reset();
+
+        MultiplayerOccupiedUpdate();
+        food.position = food.GenerateRandomPos(OccupiedCell);
+        IsRunning = true;
+    }
+
     void MultiplayerOccupiedUpdate()
     {
         OccupiedCell.clear();
         AddSequenceInOccupiedCell(snake1.body, OccupiedCell);
-        AddSequenceInOccupiedCell(snake2.body, OccupiedCell);
+
+        if (snake2)
+            AddSequenceInOccupiedCell(snake2->body, OccupiedCell);
     }
 
-    void MultiplayerDraw(){
-        snake2.Draw();
-        snake1.Draw();
-        food.Draw();
-    }
- 
-    void MultiplayerUpdate(){
-        if(IsRunning){
-   
-            
-            Movement(snake1);
-            Movement(snake2);
-            snake1.Update();
-            snake2.Update();
-            MultiplayerOccupiedUpdate();
-            CheckCollisionWithEdges(snake1);
-            CheckCollisionWithEdges(snake2);
-            CheckCollisionWithBody(snake1);
-            CheckCollisionWithBody(snake2); 
-            CheckCollisionWithOpp();            
-            CheckBodyInOtherBody();
-            CheckIfAte(snake1, food);
-            CheckIfAte(snake2, food);
-        }
-
-        if (IsRunning == false && IsKeyPressed(KEY_SPACE))
-        IsRunning = true;
-
-    }
-
-        void MupltiplayerGameOver(){
-        snake1.Reset();
-        snake2.Reset();
-        food.position = food.GenerateRandomPos(OccupiedCell);
-        IsRunning = false;
-    }
-
-//_________________________________________________________________________
-
-    void CheckIfAte(Snake& snake, Food& food){
-
-        if(Vector2Equals(snake.body[0], food.position)) {
-            food.position = food.GenerateRandomPos(OccupiedCell);
-            snake.addSegment = true;   
-        }
-    }
-
-    void CheckCollisionWithEdges(Snake& snake){
-        if(snake.body[0].x == cellcount || snake.body[0].x == -1
-          || snake.body[0].y < 0 || snake.body[0].y >= cellcount){
-            MupltiplayerGameOver();
-        }
-    }
-
-    void CheckCollisionWithBody(Snake& snake) {
-        for (int i = 1; i < snake.body.size(); i++) {
-            if (Vector2Equals(snake.body[0], snake.body[i])) {
-                MupltiplayerGameOver();
-            }
-        }
-        
-    }
-
-    void CheckCollisionWithOpp () 
+    void UpdateGame()
     {
-        for (int i = 1; i < snake2.body.size(); i++) {
-            if (Vector2Equals(snake1.body[0], snake2.body[i])) {
-                MupltiplayerGameOver();
-            }
-        }
-        
-        for (int i = 1; i < snake1.body.size(); i++) {
-            if (Vector2Equals(snake2.body[0], snake1.body[i])) {
-                MupltiplayerGameOver();
-            }
-        }
-    }
+        if (!IsRunning) return;
 
-    void CheckBodyInOtherBody()
-    {
-        for (int i = 1; i < snake2.body.size(); i++) {
-            for (int j = 1; j < snake1.body.size(); j++) {
-                if (Vector2Equals(snake2.body[i], snake1.body[j])) {
-                MupltiplayerGameOver();
-            }
-            }
-            
-        }
-               
-    }
+        Movement(snake1);
+        snake1.Update();
+        CheckCollisionWithEdges(snake1);
+        if (!IsRunning) return;
+        CheckCollisionWithBody(snake1);
+        if (!IsRunning) return;
 
-    void Movement (Snake& snake)
-    {
-
-        switch (snake.player)
+        if (snake2)
         {
-            case 1:
-            if (IsKeyDown(KEY_W) && snake.direction.y != 1)
-            snake.direction = {0, -1};
+            Movement(*snake2);
+            snake2->Update();
+            CheckCollisionWithEdges(*snake2);
+            if (!IsRunning) return;
+            CheckCollisionWithBody(*snake2);
+            if (!IsRunning) return;
 
-            if (IsKeyDown(KEY_S) && snake.direction.y != -1)
-            snake.direction = {0, 1};
+            CheckCollisionWithOpp();
+            if (!IsRunning) return;
 
-            if (IsKeyDown(KEY_A) && snake.direction.x != 1)
-            snake.direction = {-1, 0};
-
-            if (IsKeyDown(KEY_D) && snake.direction.x != -1)
-            snake.direction = {1, 0};
-            break;
-
-            case 2:
-            if (IsKeyDown(KEY_UP) && snake.direction.y != 1)
-            snake.direction = {0, -1};
-
-            if (IsKeyDown(KEY_DOWN) && snake.direction.y != -1)
-            snake.direction = {0, 1};
-
-            if (IsKeyDown(KEY_LEFT) && snake.direction.x != 1)
-            snake.direction = {-1, 0};
-
-            if (IsKeyDown(KEY_RIGHT) && snake.direction.x != -1)
-            snake.direction = {1, 0};
-            
+            if (Vector2Equals(snake1.body[0], snake2->body[0]))
+            {
+                GameOver();
+                return;
+            }
         }
 
-       
-}
+        MultiplayerOccupiedUpdate();
+
+        CheckIfAte(snake1, food);
+        if (snake2) CheckIfAte(*snake2, food);
+    }
+
+    void CheckIfAte(Snake& snake, Food& food)
+    {
+        if (Vector2Equals(snake.body[0], food.position))
+        {
+            snake.addSegment = true;
+            food.position = food.GenerateRandomPos(OccupiedCell);
+        }
+    }
+
+    void CheckCollisionWithEdges(Snake& snake)
+    {
+        int x = (int)snake.body[0].x;
+        int y = (int)snake.body[0].y;
+
+        if (x < 0 || x >= cellcount || y < 0 || y >= cellcount) 
+        {
+            GameOver();
+
+            if (snake.body.size() > 1) {
+                snake.body[0] = snake.body[1];
+            } else {
+                if (x < 0) snake.body[0].x = 0;
+                if (x >= cellcount) snake.body[0].x = cellcount - 1;
+                if (y < 0) snake.body[0].y = 0;
+                if (y >= cellcount) snake.body[0].y = cellcount - 1;
+            }
+        }
+    }
 
 
+    void CheckCollisionWithBody(Snake& snake)
+    {
+        for (int i = 1; i < snake.body.size(); i++)
+            if (Vector2Equals(snake.body[0], snake.body[i])) GameOver();
+    }
 
+    void CheckCollisionWithOpp()
+    {
+        if (!snake2) return;
+
+        for (int i = 1; i < snake2->body.size(); i++)
+            if (Vector2Equals(snake1.body[0], snake2->body[i])) GameOver();
+
+        for (int i = 1; i < snake1.body.size(); i++)
+            if (Vector2Equals(snake2->body[0], snake1.body[i])) GameOver();
+    }
+
+    void Movement(Snake& snake)
+    {
+        if (snake.player == 1)
+        {
+            if (IsKeyDown(KEY_W) && snake.direction.y != 1) snake.direction = {0, -1};
+            if (IsKeyDown(KEY_S) && snake.direction.y != -1) snake.direction = {0, 1};
+            if (IsKeyDown(KEY_A) && snake.direction.x != 1) snake.direction = {-1, 0};
+            if (IsKeyDown(KEY_D) && snake.direction.x != -1) snake.direction = {1, 0};
+        }
+        else
+        {
+            if (IsKeyDown(KEY_UP) && snake.direction.y != 1) snake.direction = {0, -1};
+            if (IsKeyDown(KEY_DOWN) && snake.direction.y != -1) snake.direction = {0, 1};
+            if (IsKeyDown(KEY_LEFT) && snake.direction.x != 1) snake.direction = {-1, 0};
+            if (IsKeyDown(KEY_RIGHT) && snake.direction.x != -1) snake.direction = {1, 0};
+        }
+    }
+
+    GameAction Draw()
+    {
+        snake1.Draw();
+        if (snake2) snake2->Draw();
+        food.Draw();
+
+        if (!IsRunning)
+        {
+            DrawRectangle(0, 0,
+                2 * offset + cellsize * cellcount,
+                2 * offset + cellsize * cellcount,
+                Fade(BLACK, 0.6f));
+
+            DrawText("GAME OVER", 220, 120, 40, RED);
+
+            Rectangle restartBtn = {200, 200, 250, 50};
+            Rectangle menuBtn = {200, 280, 250, 50};
+
+            DrawRectangleRec(restartBtn, LIGHTGRAY);
+            DrawRectangleRec(menuBtn, LIGHTGRAY);
+
+            DrawText("Jogar novamente", restartBtn.x + 20, restartBtn.y + 15, 20, BLACK);
+            DrawText("Voltar ao menu", menuBtn.x + 40, menuBtn.y + 15, 20, BLACK);
+
+            Vector2 mouse = GetMousePosition();
+
+            if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
+            {
+                if (CheckCollisionPointRec(mouse, restartBtn))
+                    return GameAction::RESTART;
+
+                if (CheckCollisionPointRec(mouse, menuBtn))
+                    return GameAction::BACK_TO_MENU;
+            }
+        }
+
+        return GameAction::NONE;
+    }
 };
 
+int main()
+{
+    InitWindow(2 * offset + cellsize * cellcount,
+               2 * offset + cellsize * cellcount,
+               "Jogo da Cobrinha");
 
-
-
-int main () {
-
-    cout << "Iniciando o jogo..." << endl;
-    InitWindow(2 * offset + cellsize * cellcount, 2 * offset + cellsize * cellcount, "Jogo da Cobrinha");
     SetTargetFPS(60);
 
-    Game game;
+voltar_menu:
+    GameMode mode;
+    bool selected = false;
 
-    double lastUpdateTime = 0;
+    while (!selected && !WindowShouldClose())
+    {
+        BeginDrawing();
+        ClearBackground(GREEN);
 
-    while (!WindowShouldClose()) {
+        DrawText("Escolha o modo de jogo", 100, 50, 30, WHITE);
 
-        if (GetTime() - lastUpdateTime >= 0.2) { 
-            game.MultiplayerUpdate();
-            lastUpdateTime = GetTime();
+        Rectangle singleBtn = {100, 150, 300, 50};
+        Rectangle multiBtn = {100, 250, 300, 50};
+
+        DrawRectangleRec(singleBtn, LIGHTGRAY);
+        DrawRectangleRec(multiBtn, LIGHTGRAY);
+
+        DrawText("Singleplayer", singleBtn.x + 50, singleBtn.y + 10, 20, BLACK);
+        DrawText("Multiplayer", multiBtn.x + 50, multiBtn.y + 10, 20, BLACK);
+
+        Vector2 mouse = GetMousePosition();
+
+        if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
+        {
+            if (CheckCollisionPointRec(mouse, singleBtn))
+            {
+                mode = GameMode::SINGLE;
+                selected = true;
+            }
+            if (CheckCollisionPointRec(mouse, multiBtn))
+            {
+                mode = GameMode::MULTI;
+                selected = true;
+            }
         }
 
+        EndDrawing();
+    }
+
+    Game game(mode);
+    double lastUpdateTime = GetTime();
+
+    while (!WindowShouldClose())
+    {
+
+        if (game.IsRunning && GetTime() - lastUpdateTime >= 0.2)
+        {
+            game.UpdateGame();
+            lastUpdateTime = GetTime();
+        }
 
         BeginDrawing();
         ClearBackground(GREEN);
 
-        game.MultiplayerDraw();
+        DrawRectangleLinesEx(
+            Rectangle{offset - 5, offset - 5,
+                    cellsize * cellcount + 10,
+                    cellsize * cellcount + 10},
+            5, DARKGREEN
+        );
 
+        GameAction action = game.Draw();
         EndDrawing();
+
+        if (!game.IsRunning)
+        {
+            if (action == GameAction::RESTART)
+            {
+                game.ResetGame();
+                lastUpdateTime = GetTime();
+            }
+            else if (action == GameAction::BACK_TO_MENU)
+            {
+                goto voltar_menu;
+            }
+        }
     }
 
     CloseWindow();
